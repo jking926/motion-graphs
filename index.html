@@ -22,7 +22,7 @@
     .title { font-size:22px; font-weight:600; margin:0 0 6px; }
     .subtitle { color:#475569; margin:0 0 16px; }
   </style>
-  <!-- React via CDN (no build tools needed) -->
+  <!-- React via CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -163,6 +163,11 @@
       const xTicks = makeTicks(xmin, xmax, 6);
       const yTicks = makeTicks(ymin, ymax, 5);
 
+      // y=0 reference line position (thick). If 0 not in range, draw at bottom.
+      const yZero = (0 >= ymin && 0 <= ymax)
+        ? yTo(0)
+        : (height - padding);
+
       const handleDownload = async (fmt) => {
         const svg = svgRef.current;
         if (fmt === "svg") {
@@ -188,33 +193,10 @@
             </div>
           </div>
           <svg ref={svgRef} width={width} height={height} style={{background:"#fff", borderRadius:12}}>
-            {/* axes */}
-            {/* Vertical axis */}
-            <line
-              x1={padding}
-              y1={padding}
-              x2={padding}
-              y2={height - padding}
-              stroke="#111827"
-              strokeWidth="1"
-            />
-            
-            {/* Horizontal reference at y = 0 (or bottom if 0 is outside view) */}
-            {(() => {
-              const yZero = (0 >= yMin && 0 <= yMax)
-                ? height - padding - ((0 - yMin) / (yMax - yMin || 1)) * (height - padding * 2)
-                : height - padding; // fallback if zero not visible
-              return (
-                <line
-                  x1={padding}
-                  y1={yZero}
-                  x2={width - padding}
-                  y2={yZero}
-                  stroke="#111827"
-                  strokeWidth="2"
-                />
-              );
-            })()}
+            {/* left vertical axis */}
+            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
+            {/* y = 0 horizontal reference (thick) */}
+            <line x1={padding} y1={yZero} x2={width-padding} y2={yZero} stroke="#111827" strokeWidth="2.5" />
 
             {/* grid & ticks */}
             {xTicks.map((tx,i)=>(
