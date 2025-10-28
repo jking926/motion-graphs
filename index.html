@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Motion Graph Maker (Piecewise a)</title>
+  <style>
+    :root { --ink:#1f2937; --line:#2563eb; --grid:#e5e7eb; --axis:#111827; --bg:#ffffff; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; color:var(--ink); background:#f8fafc; }
+    .wrap { max-width:1100px; margin:24px auto; padding:0 12px; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); padding:16px; }
+    .grid { display:grid; gap:16px; }
+    @media (min-width: 900px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px; border-bottom:1px solid #eef2f7; font-size:14px; }
+    th { text-align:left; color:#475569; }
+    input[type="number"], input[type="text"] { width:100%; padding:7px 9px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; }
+    button { appearance:none; border:1px solid #cbd5e1; background:#fff; color:#111827; padding:6px 10px; border-radius:10px; font-size:13px; cursor:pointer; }
+    button.primary { background:#111827; color:#fff; border-color:#111827; }
+    .btnrow { display:flex; gap:8px; flex-wrap:wrap; }
+    .muted { color:#64748b; font-size:12px; }
+    .title { font-size:22px; font-weight:600; margin:0 0 6px; }
+    .subtitle { color:#475569; margin:0 0 16px; }
+  </style>
+  <!-- React via CDN (no build tools needed) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="app" class="wrap"></div>
+
+  <script type="text/babel">
+    const { useMemo, useRef, useState } = React;
+
+    // -------- physics core (piecewise constant a) ----------
+    function integratePiecewise({ x0, v0, segments, samplesPerSecond = 60 }) {
+      const totalT = segments.reduce((s, seg) => s + (+seg.duration || 0), 0);
+      const dt = totalT > 0 ? 1 / samplesPerSecond : 0.016;
+
+      const boundaries = [{ t: 0, x: +x0, v: +v0 }];
+      let t = 0, x = +x0, v = +v0;
+      for (const seg of segments) {
+        const dur = +seg.duration || 0;
+        const a = +seg.a || 0;
+        const xEnd = x + v * dur + 0.5 * a * dur * dur;
+        const vEnd = v + a * dur;
+        t += dur; x = xEnd; v = vEnd;
+        boundaries.push({ t, x, v });
+      }
+
+      const evalAt = (tt) => {
+        let cum = 0, px = +x0, pv = +v0;
+        for (const seg of segments) {
+          const dur = +seg.duration || 0;
+          const a = +seg.a || 0;
+          if (tt <= cum + dur + 1e-12) {
+            const tau = tt - cum;
+            const x = px + pv * tau + 0.5 * a * tau * tau;
+            const v = pv + a * tau;
+            return { x, v, a };
+          }
+          const xEnd = px + pv * dur + 0.5 * a * dur * dur;
+          const vEnd = pv + a * dur;
+          cum += dur; px = xEnd; pv = vEnd;
+        }
+        const last = boundaries[boundaries.length - 1];
+        return { x: last.x, v: last.v, a: 0 };
+      };
+
+      const N = Math.max(2, Math.ceil(totalT / dt) + 1);
+      const tArr = Array.from({ length: N }, (_, i) => (i * totalT) / (N - 1));
+      const xArr = [], vArr = [], aArr = [];
+      for (const tt of tArr) {
+        const { x, v, a } = evalAt(tt);
+        xArr.push(x); vArr.push(v); aArr.push(a);
+      }
+
+      // acceleration step points for clean step plot
+      const aSteps = [];
+      let cum = 0;
+      for (const seg of segments) {
+        const a = +seg.a || 0, dur = +seg.duration || 0;
+        aSteps.push([cum, a], [cum + dur, a]);
+        cum += dur;
+      }
+
+      return { tArr, xArr, vArr, aArr, aSteps, totalT, boundaries };
+    }
+
+    // -------- tiny charting (pure SVG, exportable) ----------
+    function niceStep(raw) {
+      const exp = Math.floor(Math.log10(raw));
+      const frac = raw / Math.pow(10, exp);
+      const niceFrac = frac < 1.5 ? 1 : frac < 3 ? 2 : frac < 7 ? 5 : 10;
+      return niceFrac * Math.pow(10, exp);
+    }
+    function makeTicks(min, max, count=5) {
+      const span = max - min || 1;
+      const step = niceStep(span / count);
+      const start = Math.ceil(min / step) * step;
+      const ticks = [];
+      for (let v = start; v <= max + 1e-9; v += step) ticks.push(+v.toFixed(10));
+      return ticks;
+    }
+    function fmt(n) {
+      if (!isFinite(n)) return "";
+      const a = Math.abs(n);
+      if (a === 0) return "0";
+      if (a >= 1000 || a < 0.01) return n.toExponential(0);
+      if (a >= 10) return n.toFixed(0);
+      if (a >= 1) return n.toFixed(1);
+      return n.toFixed(2);
+    }
+    function stepPath(points) {
+      if (!points.length) return "";
+      let d = `M${points[0][0]},${points[0][1]}`;
+      for (let i = 1; i < points.length; i++) {
+        const [x, y] = points[i];
+        d += ` H${x} V${y}`;
+      }
+      return d;
+    }
+    function triggerDownload(url, filename) {
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    }
+    async function exportSvgToPng(svgEl, filename, width, height) {
+      const clone = svgEl.cloneNode(true);
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      const str = new XMLSerializer().serializeToString(clone);
+      const blob = new Blob([str], { type:"image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      await new Promise(res => { img.onload = res; img.src = url; });
+      const canvas = document.createElement("canvas");
+      canvas.width = width * 2; canvas.height = height * 2;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(b => {
+        const url2 = URL.createObjectURL(b);
+        triggerDownload(url2, filename);
+        URL.revokeObjectURL(url2);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function Chart({ data, xLabel, yLabel, title, height=260, padding=48, yIsStep=false }) {
+      const svgRef = useRef(null);
+      const width = 560;
+
+      const xs = data.map(d => d[0]), ys = data.map(d => d[1]);
+      let xmin = Math.min(...xs), xmax = Math.max(...xs);
+      let ymin = Math.min(...ys), ymax = Math.max(...ys);
+      if (ymin === ymax) { ymin -= 1; ymax += 1; }
+      const w = width - padding*2, h = height - padding*2;
+      const xTo = x => padding + ((x - xmin) / (xmax - xmin || 1)) * w;
+      const yTo = y => height - padding - ((y - ymin) / (ymax - ymin || 1)) * h;
+
+      const points = data.map(([x,y]) => [xTo(x), yTo(y)]);
+      const polylineD = points.map((p,i)=>`${i? "L":"M"}${p[0]},${p[1]}`).join(" ");
+      const xTicks = makeTicks(xmin, xmax, 6);
+      const yTicks = makeTicks(ymin, ymax, 5);
+
+      const handleDownload = async (fmt) => {
+        const svg = svgRef.current;
+        if (fmt === "svg") {
+          const clone = svg.cloneNode(true);
+          clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
+          const str = new XMLSerializer().serializeToString(clone);
+          const blob = new Blob([str], { type:"image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, `${title||"chart"}.svg`);
+          URL.revokeObjectURL(url);
+        } else {
+          await exportSvgToPng(svg, `${title||"chart"}.png`, width, height);
+        }
+      };
+
+      return (
+        <div className="card">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={{fontWeight:600}}>{title}</div>
+            <div className="btnrow">
+              <button onClick={()=>handleDownload("png")}>Download PNG</button>
+              <button onClick={()=>handleDownload("svg")}>Download SVG</button>
+            </div>
+          </div>
+          <svg ref={svgRef} width={width} height={height} style={{background:"#fff", borderRadius:12}}>
+            {/* axes */}
+            <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
+            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
+            {/* grid & ticks */}
+            {xTicks.map((tx,i)=>(
+              <g key={"xt"+i}>
+                <line x1={xTo(tx)} y1={padding} x2={xTo(tx)} y2={height-padding} stroke="#e5e7eb" />
+                <line x1={xTo(tx)} y1={height-padding} x2={xTo(tx)} y2={height-padding+6} stroke="#111827" />
+                <text x={xTo(tx)} y={height-padding+18} fontSize="10" textAnchor="middle" fill="#444">{fmt(tx)}</text>
+              </g>
+            ))}
+            {yTicks.map((ty,i)=>(
+              <g key={"yt"+i}>
+                <line x1={padding} y1={yTo(ty)} x2={width-padding} y2={yTo(ty)} stroke="#e5e7eb" />
+                <line x1={padding-6} y1={yTo(ty)} x2={padding} y2={yTo(ty)} stroke="#111827" />
+                <text x={padding-10} y={yTo(ty)+3} fontSize="10" textAnchor="end" fill="#444">{fmt(ty)}</text>
+              </g>
+            ))}
+            {/* labels */}
+            <text x={width/2} y={height-10} fontSize="12" textAnchor="middle" fill="#333">{xLabel}</text>
+            <text x="16" y={height/2} fontSize="12" textAnchor="middle" fill="#333" transform={`rotate(-90 16 ${height/2})`}>{yLabel}</text>
+            {/* data */}
+            {yIsStep
+              ? <path d={stepPath(points)} fill="none" stroke="#2563eb" strokeWidth="2" />
+              : <path d={polylineD} fill="none" stroke="#2563eb" strokeWidth="2" />
+            }
+          </svg>
+        </div>
+      );
+    }
+
+    // -------- App ----------
+    function App() {
+      const [x0, setX0] = useState(0);
+      const [v0, setV0] = useState(2);
+      const [segments, setSegments] = useState([
+        { duration: 2, a: 0 },
+        { duration: 2, a: -1 },
+        { duration: 1.5, a: 2 }
+      ]);
+      const [sps, setSps] = useState(60);
+
+      const { tArr, xArr, vArr, aSteps, totalT } = useMemo(() =>
+        integratePiecewise({
+          x0:Number(x0)||0, v0:Number(v0)||0,
+          segments: segments.map(s=>({duration:+s.duration||0,a:+s.a||0})),
+          samplesPerSecond: Math.max(5, Math.min(240, Number(sps)||60))
+        }), [x0,v0,segments,sps]);
+
+      const xData = tArr.map((t,i)=>[t, xArr[i]]);
+      const vData = tArr.map((t,i)=>[t, vArr[i]]);
+      const aData = aSteps.length ? aSteps : [[0,0],[Math.max(1,totalT),0]];
+
+      const addSeg = ()=> setSegments(s=>[...s,{duration:1,a:0}]);
+      const rmSeg = (i)=> setSegments(s=>s.filter((_,j)=>j!==i));
+      const updSeg = (i,key,val)=> setSegments(s=>s.map((seg,j)=> j===i ? {...seg,[key]:val} : seg));
+
+      return (
+        <div className="grid" style={{gap:24}}>
+          <header>
+            <h1 className="title">Motion Graph Maker (Piecewise Constant Acceleration)</h1>
+            <p className="subtitle">Enter x₀, v₀, and per-interval acceleration → export clean SVG/PNG graphs for worksheets.</p>
+          </header>
+
+          <div className="grid grid-2" style={{gap:16}}>
+            <div className="card">
+              <h3 style={{marginTop:0, marginBottom:10}}>Initial Conditions</h3>
+              <div className="grid" style={{gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
+                <div>
+                  <label className="muted">x₀ (m)</label>
+                  <input type="number" value={x0} onChange={e=>setX0(e.target.value)} />
+                </div>
+                <div>
+                  <label className="muted">v₀ (m/s)</label>
+                  <input type="number" value={v0} onChange={e=>setV0(e.target.value)} />
+                </div>
+                <div>
+                  <label className="muted">Sampling (pts/s)</label>
+                  <input type="number" min="5" max="240" value={sps} onChange={e=>setSps(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <h3 style={{marginTop:0}}>Time Segments (Δt, a)</h3>
+                <button className="primary" onClick={addSeg}>+ Add segment</button>
+              </div>
+              <table>
+                <thead><tr><th>#</th><th>Δt (s)</th><th>a (m/s²)</th><th></th></tr></thead>
+                <tbody>
+                  {segments.map((seg,i)=>(
+                    <tr key={i}>
+                      <td>{i+1}</td>
+                      <td><input type="number" min="0" step="any" value={seg.duration} onChange={e=>updSeg(i,"duration", e.target.value)} /></td>
+                      <td><input type="number" step="any" value={seg.a} onChange={e=>updSeg(i,"a", e.target.value)} /></td>
+                      <td style={{textAlign:"right"}}><button onClick={()=>rmSeg(i)} disabled={segments.length===1}>Remove</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="muted" style={{marginTop:8}}>Total time: <b>{fmt(totalT)}</b> s</div>
+            </div>
+          </div>
+
+          <div className="grid" style={{gap:16}}>
+            <Chart data={xData} xLabel="time (s)" yLabel="position (m)" title="Position vs Time" />
+            <Chart data={vData} xLabel="time (s)" yLabel="velocity (m/s)" title="Velocity vs Time" />
+            <Chart data={aData} xLabel="time (s)" yLabel="acceleration (m/s²)" title="Acceleration vs Time" yIsStep />
+          </div>
+
+          <footer className="muted">
+            Tip: Use whole-number Δt and a for tidy tick marks. PNG/SVG paste crisply into Google Docs/Slides.
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+  </script>
+</body>
+</html>
