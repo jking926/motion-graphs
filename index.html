@@ -189,8 +189,33 @@
           </div>
           <svg ref={svgRef} width={width} height={height} style={{background:"#fff", borderRadius:12}}>
             {/* axes */}
-            <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
-            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
+            {/* Vertical axis */}
+            <line
+              x1={padding}
+              y1={padding}
+              x2={padding}
+              y2={height - padding}
+              stroke="#111827"
+              strokeWidth="1"
+            />
+            
+            {/* Horizontal reference at y = 0 (or bottom if 0 is outside view) */}
+            {(() => {
+              const yZero = (0 >= yMin && 0 <= yMax)
+                ? height - padding - ((0 - yMin) / (yMax - yMin || 1)) * (height - padding * 2)
+                : height - padding; // fallback if zero not visible
+              return (
+                <line
+                  x1={padding}
+                  y1={yZero}
+                  x2={width - padding}
+                  y2={yZero}
+                  stroke="#111827"
+                  strokeWidth="2"
+                />
+              );
+            })()}
+
             {/* grid & ticks */}
             {xTicks.map((tx,i)=>(
               <g key={"xt"+i}>
