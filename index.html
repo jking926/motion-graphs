@@ -224,7 +224,7 @@
             <text x={width/2} y={height - padding + X_TICK_OFFSET + AXIS_FONT + X_LABEL_OFFSET} fontSize={AXIS_FONT} textAnchor="middle" fill="#333">
               {xLabel}
             </text>
-            <g transform={`translate(${padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)}, ${height / 2}) rotate(-90)`}>
+            <g transform={`translate(${padding + (Y_TICK_OFFSET + Y_LABEL_OFFSET)}, ${height / 2}) rotate(-90)`}>
               <text fontSize={AXIS_FONT} textAnchor="middle" dominantBaseline="central" fill="#333">
                 {yLabel}
               </text>
