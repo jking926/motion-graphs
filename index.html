@@ -215,8 +215,8 @@
               </g>
             ))}
             {/* labels */}
-            <text x={width/2} y={height-10} fontSize="18" textAnchor="middle" fill="#333">{xLabel}</text>
-            <text x="16" y={height/2} fontSize="18" textAnchor="middle" fill="#333" transform={`rotate(-90 16 ${height/2})`}>{yLabel}</text>
+            <text x={width/2} y={height-2} fontSize="18" textAnchor="middle" fill="#333">{xLabel}</text>
+            <text x="22" y={height/2} fontSize="18" textAnchor="middle" fill="#333" transform={`rotate(-90 16 ${height/2})`}>{yLabel}</text>
             {/* data */}
             {yIsStep
               ? <path d={stepPath(points)} fill="none" stroke="#2563eb" strokeWidth="2" />
