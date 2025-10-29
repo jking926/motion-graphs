@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -24,7 +24,6 @@
     .title { font-size:22px; font-weight:600; margin:0 0 6px; }
     .subtitle { color:#475569; margin:0 0 16px; }
   </style>
-  <!-- React via CDN -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -39,7 +38,6 @@
     function integratePiecewise({ x0, v0, segments, samplesPerSecond = 60 }) {
       const totalT = segments.reduce((s, seg) => s + (+seg.duration || 0), 0);
       const dt = totalT > 0 ? 1 / samplesPerSecond : 0.016;
-
       const boundaries = [{ t: 0, x: +x0, v: +v0 }];
       let t = 0, x = +x0, v = +v0;
       for (const seg of segments) {
@@ -50,7 +48,6 @@
         t += dur; x = xEnd; v = vEnd;
         boundaries.push({ t, x, v });
       }
-
       const evalAt = (tt) => {
         let cum = 0, px = +x0, pv = +v0;
         for (const seg of segments) {
@@ -69,7 +66,6 @@
         const last = boundaries[boundaries.length - 1];
         return { x: last.x, v: last.v, a: 0 };
       };
-
       const N = Math.max(2, Math.ceil(totalT / dt) + 1);
       const tArr = Array.from({ length: N }, (_, i) => (i * totalT) / (N - 1));
       const xArr = [], vArr = [], aArr = [];
@@ -77,7 +73,6 @@
         const { x, v, a } = evalAt(tt);
         xArr.push(x); vArr.push(v); aArr.push(a);
       }
-
       const aSteps = [];
       let cum = 0;
       for (const seg of segments) {
@@ -85,7 +80,6 @@
         aSteps.push([cum, a], [cum + dur, a]);
         cum += dur;
       }
-
       return { tArr, xArr, vArr, aArr, aSteps, totalT, boundaries };
     }
 
@@ -147,14 +141,23 @@
       });
     }
 
-    function Chart({ data, xLabel, yLabel, title, height=260, padding=48, yIsStep=false, decimalsX=null, decimalsY=null }) {
+    function Chart({ data, xLabel, yLabel, title, height=300, padding=48, yIsStep=false, decimalsX=null, decimalsY=null }) {
       const svgRef = useRef(null);
       const width = 560;
+
+      // visual constants (spacing with larger fonts)
+      const TICK_FONT = 14;
+      const AXIS_FONT = 18;
+      const X_TICK_OFFSET = 26; // distance from axis baseline to x tick numbers
+      const Y_TICK_OFFSET = 12; // distance from axis baseline to y tick numbers
+      const X_LABEL_OFFSET = 8; // extra gap below x tick numbers
+      const Y_LABEL_OFFSET = 14; // extra gap left of y tick numbers
 
       const xs = data.map(d => d[0]), ys = data.map(d => d[1]);
       let xmin = Math.min(...xs), xmax = Math.max(...xs);
       let ymin = Math.min(...ys), ymax = Math.max(...ys);
       if (ymin === ymax) { ymin -= 1; ymax += 1; }
+
       const w = width - padding*2, h = height - padding*2;
       const xTo = x => padding + ((x - xmin) / (xmax - xmin || 1)) * w;
       const yTo = y => height - padding - ((y - ymin) / (ymax - ymin || 1)) * h;
@@ -165,7 +168,6 @@
       const yTicks = makeTicks(ymin, ymax, 5);
 
       const yZero = (0 >= ymin && 0 <= ymax) ? yTo(0) : (height - padding);
-
       const fmtX = (v) => (decimalsX === null ? fmtSmart(v) : fmtFixed(v, decimalsX));
       const fmtY = (v) => (decimalsY === null ? fmtSmart(v) : fmtFixed(v, decimalsY));
 
@@ -194,9 +196,8 @@
             </div>
           </div>
           <svg ref={svgRef} width={width} height={height} style={{background:"#fff", borderRadius:12}}>
-            {/* left vertical axis */}
+            {/* axes */}
             <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
-            {/* y = 0 horizontal reference (thick) */}
             <line x1={padding} y1={yZero} x2={width-padding} y2={yZero} stroke="#111827" strokeWidth="2.5" />
 
             {/* grid & ticks */}
@@ -204,19 +205,30 @@
               <g key={"xt"+i}>
                 <line x1={xTo(tx)} y1={padding} x2={xTo(tx)} y2={height-padding} stroke="#e5e7eb" />
                 <line x1={xTo(tx)} y1={height-padding} x2={xTo(tx)} y2={height-padding+6} stroke="#111827" />
-                <text x={xTo(tx)} y={height-padding+18} fontSize="14" textAnchor="middle" fill="#444">{fmtX(tx)}</text>
+                <text x={xTo(tx)} y={height - padding + X_TICK_OFFSET} fontSize={TICK_FONT} textAnchor="middle" fill="#444">
+                  {fmtX(tx)}
+                </text>
               </g>
             ))}
             {yTicks.map((ty,i)=>(
               <g key={"yt"+i}>
                 <line x1={padding} y1={yTo(ty)} x2={width-padding} y2={yTo(ty)} stroke="#e5e7eb" />
                 <line x1={padding-6} y1={yTo(ty)} x2={padding} y2={yTo(ty)} stroke="#111827" />
-                <text x={padding-10} y={yTo(ty)+3} fontSize="14" textAnchor="end" fill="#444">{fmtY(ty)}</text>
+                <text x={padding - (Y_TICK_OFFSET + 2)} y={yTo(ty)+4} fontSize={TICK_FONT} textAnchor="end" fill="#444">
+                  {fmtY(ty)}
+                </text>
               </g>
             ))}
-            {/* labels */}
-            <text x={width/2} y={height-2} fontSize="18" textAnchor="middle" fill="#333">{xLabel}</text>
-            <text x="22" y={height/2} fontSize="18" textAnchor="middle" fill="#333" transform={`rotate(-90 16 ${height/2})`}>{yLabel}</text>
+
+            {/* axis labels with larger gaps */}
+            <text x={width/2} y={height - 2} fontSize={AXIS_FONT} textAnchor="middle" fill="#333">
+              {xLabel}
+            </text>
+            <text x={padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)} y={height/2} fontSize={AXIS_FONT} textAnchor="middle" fill="#333"
+                  transform={`rotate(-90 ${padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)} ${height/2})`}>
+              {yLabel}
+            </text>
+
             {/* data */}
             {yIsStep
               ? <path d={stepPath(points)} fill="none" stroke="#2563eb" strokeWidth="2" />
@@ -239,21 +251,20 @@
       const [sps, setSps] = useState(60);
 
       // decimals controls
-      const [sameDP, setSameDP] = useState(true);         // single setting vs per-variable
-      const [allDP, setAllDP]   = useState('auto');       // 'auto' or 0..4
-      const [dpT, setDpT] = useState('auto');             // time
-      const [dpX, setDpX] = useState('auto');             // position
-      const [dpV, setDpV] = useState('auto');             // velocity
-      const [dpA, setDpA] = useState('auto');             // acceleration
+      const [sameDP, setSameDP] = useState(true);
+      const [allDP, setAllDP] = useState('auto');
+      const [dpT, setDpT] = useState('auto');
+      const [dpX, setDpX] = useState('auto');
+      const [dpV, setDpV] = useState('auto');
+      const [dpA, setDpA] = useState('auto');
 
       const dec = (val) => (val === 'auto' ? null : parseInt(val, 10));
-
       const decT = sameDP ? dec(allDP) : dec(dpT);
       const decX = sameDP ? dec(allDP) : dec(dpX);
       const decV = sameDP ? dec(allDP) : dec(dpV);
       const decA = sameDP ? dec(allDP) : dec(dpA);
 
-      const { tArr, xArr, vArr, aSteps, totalT } = useMemo(() =>
+      const { tArr, xArr, vArr, aSteps } = useMemo(() =>
         integratePiecewise({
           x0:Number(x0)||0, v0:Number(v0)||0,
           segments: segments.map(s=>({duration:+s.duration||0,a:+s.a||0})),
@@ -262,9 +273,9 @@
 
       const xData = tArr.map((t,i)=>[t, xArr[i]]);
       const vData = tArr.map((t,i)=>[t, vArr[i]]);
-      const aData = aSteps.length ? aSteps : [[0,0],[Math.max(1,segments.reduce((a,b)=>a+(+b.duration||0),0)),0]];
+      const totalT = segments.reduce((a,b)=>a+(+b.duration||0),0);
+      const aData = aSteps.length ? aSteps : [[0,0],[Math.max(1,totalT),0]];
 
-      // label helper for totals
       const labelFixed = (v, dp) => (dp === null ? fmtSmart(v) : Number(v).toFixed(dp));
 
       const addSeg = ()=> setSegments(s=>[...s,{duration:1,a:0}]);
@@ -282,18 +293,9 @@
             <div className="card">
               <h3 style={{marginTop:0, marginBottom:10}}>Initial Conditions</h3>
               <div className="grid" style={{gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
-                <div>
-                  <label>x₀ (m)</label>
-                  <input type="number" value={x0} onChange={e=>setX0(e.target.value)} />
-                </div>
-                <div>
-                  <label>v₀ (m/s)</label>
-                  <input type="number" value={v0} onChange={e=>setV0(e.target.value)} />
-                </div>
-                <div>
-                  <label>Sampling (pts/s)</label>
-                  <input type="number" min="5" max="240" value={sps} onChange={e=>setSps(e.target.value)} />
-                </div>
+                <div><label>x₀ (m)</label><input type="number" value={x0} onChange={e=>setX0(e.target.value)} /></div>
+                <div><label>v₀ (m/s)</label><input type="number" value={v0} onChange={e=>setV0(e.target.value)} /></div>
+                <div><label>Sampling (pts/s)</label><input type="number" min="5" max="240" value={sps} onChange={e=>setSps(e.target.value)} /></div>
               </div>
             </div>
 
@@ -315,7 +317,7 @@
                   ))}
                 </tbody>
               </table>
-              <div className="muted" style={{marginTop:8}}>Total time: <b>{labelFixed(segments.reduce((a,b)=>a+(+b.duration||0),0), decT)}</b> s</div>
+              <div className="muted" style={{marginTop:8}}>Total time: <b>{labelFixed(totalT, decT)}</b> s</div>
             </div>
           </div>
 
@@ -340,29 +342,25 @@
               </div>
             ) : (
               <div className="grid" style={{gridTemplateColumns:"repeat(4, 1fr)", gap:12, marginTop:12}}>
-                <div>
-                  <label>t (time)</label>
+                <div><label>t (time)</label>
                   <select value={dpT} onChange={e=>setDpT(e.target.value)}>
                     <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option>
                     <option value="2">2</option><option value="3">3</option><option value="4">4</option>
                   </select>
                 </div>
-                <div>
-                  <label>x (position)</label>
+                <div><label>x (position)</label>
                   <select value={dpX} onChange={e=>setDpX(e.target.value)}>
                     <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option>
                     <option value="2">2</option><option value="3">3</option><option value="4">4</option>
                   </select>
                 </div>
-                <div>
-                  <label>v (velocity)</label>
+                <div><label>v (velocity)</label>
                   <select value={dpV} onChange={e=>setDpV(e.target.value)}>
                     <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option>
                     <option value="2">2</option><option value="3">3</option><option value="4">4</option>
                   </select>
                 </div>
-                <div>
-                  <label>a (acceleration)</label>
+                <div><label>a (acceleration)</label>
                   <select value={dpA} onChange={e=>setDpA(e.target.value)}>
                     <option value="auto">Auto</option><option value="0">0</option><option value="1">1</option>
                     <option value="2">2</option><option value="3">3</option><option value="4">4</option>
@@ -373,31 +371,9 @@
           </div>
 
           <div className="grid" style={{gap:16}}>
-            <Chart
-              data={xData}
-              xLabel="time (s)"
-              yLabel="position (m)"
-              title="Position vs Time"
-              decimalsX={decT}
-              decimalsY={decX}
-            />
-            <Chart
-              data={vData}
-              xLabel="time (s)"
-              yLabel="velocity (m/s)"
-              title="Velocity vs Time"
-              decimalsX={decT}
-              decimalsY={decV}
-            />
-            <Chart
-              data={aData}
-              xLabel="time (s)"
-              yLabel="acceleration (m/s²)"
-              title="Acceleration vs Time"
-              yIsStep
-              decimalsX={decT}
-              decimalsY={decA}
-            />
+            <Chart data={xData} xLabel="time (s)" yLabel="position (m)" title="Position vs Time" decimalsX={decT} decimalsY={decX} />
+            <Chart data={vData} xLabel="time (s)" yLabel="velocity (m/s)" title="Velocity vs Time" decimalsX={decT} decimalsY={decV} />
+            <Chart data={aData} xLabel="time (s)" yLabel="acceleration (m/s²)" title="Acceleration vs Time" yIsStep decimalsX={decT} decimalsY={decA} />
           </div>
 
           <footer className="muted">
