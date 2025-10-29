@@ -214,20 +214,21 @@
               <g key={"yt"+i}>
                 <line x1={padding} y1={yTo(ty)} x2={width-padding} y2={yTo(ty)} stroke="#e5e7eb" />
                 <line x1={padding-6} y1={yTo(ty)} x2={padding} y2={yTo(ty)} stroke="#111827" />
-                <text x={padding - (Y_TICK_OFFSET + 2)} y={yTo(ty)+4} fontSize={TICK_FONT} textAnchor="end" fill="#444">
+                <text x={padding - (Y_TICK_OFFSET)} y={yTo(ty)+4} fontSize={TICK_FONT} textAnchor="end" fill="#444">
                   {fmtY(ty)}
                 </text>
               </g>
             ))}
 
             {/* axis labels with larger gaps */}
-            <text x={width/2} y={height - 2} fontSize={AXIS_FONT} textAnchor="middle" fill="#333">
+            <text x={width/2} y={height - padding + X_TICK_OFFSET + AXIS_FONT + X_LABEL_OFFSET} fontSize={AXIS_FONT} textAnchor="middle" fill="#333">
               {xLabel}
             </text>
-            <text x={padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)} y={height/2} fontSize={AXIS_FONT} textAnchor="middle" fill="#333"
-                  transform={`rotate(-90 ${padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)} ${height/2})`}>
-              {yLabel}
-            </text>
+            <g transform={`translate(${padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)}, ${height / 2}) rotate(-90)`}>
+              <text fontSize={AXIS_FONT} textAnchor="middle" dominantBaseline="central" fill="#333">
+                {yLabel}
+              </text>
+            </g>
 
             {/* data */}
             {yIsStep
