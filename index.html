@@ -148,10 +148,10 @@
       // visual constants (spacing with larger fonts)
       const TICK_FONT = 14;
       const AXIS_FONT = 18;
-      const X_TICK_OFFSET = 26; // distance from axis baseline to x tick numbers
-      const Y_TICK_OFFSET = 12; // distance from axis baseline to y tick numbers
-      const X_LABEL_OFFSET = 8; // extra gap below x tick numbers
-      const Y_LABEL_OFFSET = -14; // extra gap left of y tick numbers
+      const X_TICK_OFFSET = 20; // distance from axis baseline to x tick numbers
+      const Y_TICK_OFFSET = 10; // distance from axis baseline to y tick numbers
+      const X_LABEL_OFFSET = 12; // extra gap below x tick numbers
+      const Y_LABEL_OFFSET = 26; // extra gap left of y tick numbers
 
       const xs = data.map(d => d[0]), ys = data.map(d => d[1]);
       let xmin = Math.min(...xs), xmax = Math.max(...xs);
@@ -224,11 +224,12 @@
             <text x={width/2} y={height - padding + X_TICK_OFFSET + AXIS_FONT + X_LABEL_OFFSET} fontSize={AXIS_FONT} textAnchor="middle" fill="#333">
               {xLabel}
             </text>
-            <g transform={`translate(${padding + (Y_TICK_OFFSET + Y_LABEL_OFFSET)}, ${height / 2}) rotate(-90)`}>
+            <g transform={`translate(${padding - (Y_TICK_OFFSET + Y_LABEL_OFFSET)}, ${height / 2}) rotate(-90)`}>
               <text fontSize={AXIS_FONT} textAnchor="middle" dominantBaseline="central" fill="#333">
                 {yLabel}
               </text>
             </g>
+
 
             {/* data */}
             {yIsStep
