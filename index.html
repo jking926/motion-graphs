@@ -155,14 +155,21 @@
     }) {
       const svgRef = useRef(null);
       const width = 560;
+      // line thickness settings
+      const LINE_WIDTH_DATA = 2;     // thickness of the blue motion curve
+      const LINE_WIDTH_AXIS = 1;     // thin vertical/horizontal axes
+      const LINE_WIDTH_AXIS_ZERO = 2.5; // thick line at y=0
+      const LINE_WIDTH_GRID = 0.8;   // light grid lines
+      const LINE_WIDTH_TICKS = 1;    // small tick marks at ends of axes
+
 
       // fonts & spacing
-      const TICK_FONT = 14;
-      const AXIS_FONT = 18;
+      const TICK_FONT = 18;
+      const AXIS_FONT = 24;
       const X_TICK_OFFSET = 20;   // below axis baseline
       const X_LABEL_OFFSET = 10;  // extra gap below tick numbers
       const Y_TICK_OFFSET = 12;   // left of axis baseline
-      const Y_LABEL_OFFSET = 36;  // extra gap left of tick numbers
+      const Y_LABEL_OFFSET = 40;  // extra gap left of tick numbers
 
       const xs = data.map(d => d[0]), ys = data.map(d => d[1]);
       let xmin = Math.min(...xs), xmax = Math.max(...xs);
@@ -191,21 +198,22 @@
           </div>
           <svg ref={svgRef} width={width} height={height} style={{background:"#fff", borderRadius:12}}>
             {/* axes */}
-            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth="1" />
-            <line x1={padding} y1={yZero} x2={width-padding} y2={yZero} stroke="#111827" strokeWidth="2.5" />
+            <line x1={padding} y1={padding} x2={padding} y2={height-padding} stroke="#111827" strokeWidth={LINE_WIDTH_AXIS} />
+            <line x1={padding} y1={yZero} x2={width-padding} y2={yZero} stroke="#111827" strokeWidth={LINE_WIDTH_AXIS_ZERO} />
+
 
             {/* grid & ticks */}
             {xTicks.map((tx,i)=>(
               <g key={"xt"+i}>
-                <line x1={xTo(tx)} y1={padding} x2={xTo(tx)} y2={height-padding} stroke="#e5e7eb" />
-                <line x1={xTo(tx)} y1={height-padding} x2={xTo(tx)} y2={height-padding+6} stroke="#111827" />
+                <line x1={xTo(tx)} y1={padding} x2={xTo(tx)} y2={height-padding} stroke="#e5e7eb" strokeWidth={LINE_WIDTH_GRID} />
+                <line x1={xTo(tx)} y1={height-padding} x2={xTo(tx)} y2={height-padding+6} stroke="#111827" strokeWidth={LINE_WIDTH_TICKS} />
                 <text x={xTo(tx)} y={height - padding + X_TICK_OFFSET} fontSize={TICK_FONT} textAnchor="middle" fill="#444">{fmtX(tx)}</text>
               </g>
             ))}
             {yTicks.map((ty,i)=>(
               <g key={"yt"+i}>
-                <line x1={padding} y1={yTo(ty)} x2={width-padding} y2={yTo(ty)} stroke="#e5e7eb" />
-                <line x1={padding-6} y1={yTo(ty)} x2={padding} y2={yTo(ty)} stroke="#111827" />
+                <line x1={padding} y1={yTo(ty)} x2={width-padding} y2={yTo(ty)} stroke="#e5e7eb" strokeWidth={LINE_WIDTH_GRID} />
+                <line x1={padding-6} y1={yTo(ty)} x2={padding} y2={yTo(ty)} stroke="#111827" strokeWidth={LINE_WIDTH_TICKS} />
                 <text x={padding - Y_TICK_OFFSET} y={yTo(ty)+4} fontSize={TICK_FONT} textAnchor="end" fill="#444">{fmtY(ty)}</text>
               </g>
             ))}
@@ -224,7 +232,7 @@
             </g>
 
             {/* data */}
-            <path d={stepPath(points)} fill="none" stroke="#2563eb" strokeWidth="2" />
+            <path d={stepPath(points)} fill="none" stroke="#2563eb" strokeWidth={LINE_WIDTH_DATA} />
           </svg>
         </div>
       );
